@@ -49,7 +49,7 @@ You can customise the YAML you get by passing some of Weave Net's options, argum
 
   - `known-peers`: comma-separated list of hosts. Default: empty.
   - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
-  - `disable-npc`: boolean (`true|false`). Default: `false`.
+  - `disable-npc`: boolean (`true|false`). Default: `false`. **Note:** This is implemented.
   - `env.NAME=VALUE`: add environment variable `NAME` and set it to `VALUE`. **Note:** This is implemented, for the allowed set of variables.
   - `seLinuxOptions.NAME=VALUE`: add SELinux option `NAME` and set it to `VALUE`, e.g. `seLinuxOptions.type=spc_t`. **Note:** This is implemented, but no sanity check on SELinux options.
 
