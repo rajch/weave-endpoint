@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Download weave net manifest",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
@@ -15,5 +16,9 @@
   "bugs": {
     "url": "https://github.com/rajch/weave-endpoint/issues"
   },
-  "homepage": "https://github.com/rajch/weave-endpoint#readme"
+  "homepage": "https://github.com/rajch/weave-endpoint#readme",
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "node-fetch": "^3.2.10"
+  }
 }
