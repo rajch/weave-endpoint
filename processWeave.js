@@ -37,7 +37,7 @@ const process = (manifest, params) => {
   try {
     yamlDocs = yaml.loadAll(manifest)
   } catch {
-      return processError('Could not read yaml from manifest')
+    return processError('Could not read yaml from manifest')
   }
 
   // The weave net manifest contains a List object, which
@@ -74,7 +74,25 @@ const process = (manifest, params) => {
 
   return {
     status: 'success',
-    body: yaml.dump(yamlDocs)
+    body: yaml.dump(yamlDocs[0])
+  }
+}
+
+/**
+ * Inserts or modifies an environment variable in an env: array
+ * @param {Object[]} envvararray 
+ * @param {Object} element
+ * @param {string} element.name
+ * @param {string} element.value
+ */
+const upsertEnvVar= (envvararray, element) => {
+  const existingIndex = envvararray.findIndex((v) => v.name === element.name)
+  if(existingIndex!==-1) {
+    console.log(`Modifying env var ${element.name}=${element.value} at index ${existingIndex}`)
+    envvararray[existingIndex].value = element.value
+  } else {
+    console.log(`Adding env var ${element.name}=${element.value}`)
+    envvararray.push(element)
   }
 }
 
@@ -102,8 +120,9 @@ const allowedEnvVars = [
 
 const processEnvVar = (varname, varvalue, ds) => {
   if (allowedEnvVars.includes(varname)) {
-    console.log(`Adding env var ${varname}=${varvalue}`)
-    ds.spec.template.spec.containers[0].env.push({ name: varname, value: varvalue })
+    
+    //ds.spec.template.spec.containers[0].env.push({ name: varname, value: varvalue })
+    upsertEnvVar(ds.spec.template.spec.containers[0].env,{ name: varname, value: varvalue })
   } else {
     console.log(`Not adding unknown env var ${varname}=${varvalue}`)
   }
@@ -122,6 +141,8 @@ const processOtherOptions = (optname, optval, ds) => {
   const processor = otherOptionsMap[optname]
   if (processor) {
     processor(optname, optval, ds)
+  } else {
+    console.log(`Ignoring unknown option ${optname}`)
   }
 }
 
@@ -129,6 +150,7 @@ const processOtherOptions = (optname, optval, ds) => {
 
 const processVersion = (optname, optval, ds) => {
   console.log(`Processing option ${optname}=${optval}`)
+
   // Fetch the image name from the first container, and 
   // replace ':latest' with specified version.
   let imageName = ds.spec.template.spec.containers[0].image
@@ -143,8 +165,28 @@ const processVersion = (optname, optval, ds) => {
   }
 }
 
+// The 'disable-npc' query parameter
+
+const processDisableNPC = (optname, optval, ds) => {
+  console.log(`Processing option ${optname}=${optval}`)
+
+  if(optval!=='true') {
+    return
+  } 
+
+  // Set the EXPECT_NPC environment variable to '0'
+  processEnvVar('EXPECT_NPC', '0', ds)
+
+  // Remove the weave-npc container if it exists
+  const npcContainerIndex = ds.spec.template.spec.containers.findIndex((c) => c.name ==='weave-npc')
+  if(npcContainerIndex!==-1) {
+    ds.spec.template.spec.containers.splice(npcContainerIndex,1)
+  }
+}
+
 const otherOptionsMap = {
-  'version': processVersion
+  'version': processVersion,
+  'disable-npc': processDisableNPC
 }
 
 export default processWeave
