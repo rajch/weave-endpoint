@@ -112,6 +112,12 @@ $ curl -fsSLo weave-daemonset.yaml "https://weave-community-downloader.azurewebs
 
 ## How it works
 
-A simple request on either url pattern, without any query parameters, will redirect to the k8s-version-appropriate manifest on the latest weave net release on GitHub.
+~~A simple request on either url pattern, without any query parameters, will redirect to the k8s-version-appropriate manifest on the latest weave net release on GitHub.~~
 
-If there are query parameters, the appropriate manifest will be fetched, modified as per the parameters, and emitted.
+~~If there are query parameters, the appropriate manifest will be fetched, modified as per the parameters, and emitted.~~
+
+The k8s-version-appropriate manifest is fetched from the latest weave net release on GitHub.
+
+It is then modified as per parameters, and emitted.
+
+One compulsory modification is: the `:latest` tag on all images found in the manifest is changed to `:2.8.1`. This is because of issue [3974](https://github.com/weaveworks/weave/issues/3974) on the weave net repository, and a [solution](https://github.com/weaveworks/weave/issues/3960#issuecomment-1401496388) proposed in a comment on another issue.

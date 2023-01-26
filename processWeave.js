@@ -70,7 +70,14 @@ const process = (manifest, params) => {
 
     // Process other options
     processOtherOptions(opt[0], opt[1], ds)
+
   }
+
+  // Patch :latest tag, because of:
+  //   https://github.com/weaveworks/weave/issues/3974
+  //   https://github.com/weaveworks/weave/issues/3960#issuecomment-1401496388
+  //   https://github.com/weaveworks/weave/issues/3948#issuecomment-1401989143
+  patchLatestTag(ds)
 
   return {
     status: 'success',
@@ -85,9 +92,9 @@ const process = (manifest, params) => {
  * @param {string} element.name
  * @param {string} element.value
  */
-const upsertEnvVar= (envvararray, element) => {
+const upsertEnvVar = (envvararray, element) => {
   const existingIndex = envvararray.findIndex((v) => v.name === element.name)
-  if(existingIndex!==-1) {
+  if (existingIndex !== -1) {
     console.log(`Modifying env var ${element.name}=${element.value} at index ${existingIndex}`)
     envvararray[existingIndex].value = element.value
   } else {
@@ -120,9 +127,9 @@ const allowedEnvVars = [
 
 const processEnvVar = (varname, varvalue, ds) => {
   if (allowedEnvVars.includes(varname)) {
-    
+
     //ds.spec.template.spec.containers[0].env.push({ name: varname, value: varvalue })
-    upsertEnvVar(ds.spec.template.spec.containers[0].env,{ name: varname, value: varvalue })
+    upsertEnvVar(ds.spec.template.spec.containers[0].env, { name: varname, value: varvalue })
   } else {
     console.log(`Not adding unknown env var ${varname}=${varvalue}`)
   }
@@ -151,17 +158,31 @@ const processOtherOptions = (optname, optval, ds) => {
 const processVersion = (optname, optval, ds) => {
   console.log(`Processing option ${optname}=${optval}`)
 
-  // Fetch the image name from the first container, and 
-  // replace ':latest' with specified version.
-  let imageName = ds.spec.template.spec.containers[0].image
-  imageName = imageName.replace(/\:latest$/, `:${optval}`)
+  const replaceLatest = (imageName, optval) => {
+    return imageName.replace(/\:latest$/, `:${optval}`)
+  }
+
+  // Change the image property of the init container
+  // if it exists
+  if (ds.spec.template.spec.initContainers[0]) {
+    ds.spec.template.spec.initContainers[0].image = replaceLatest(
+      ds.spec.template.spec.initContainers[0].image,
+      optval
+    )
+  }
 
   // Change the image property of the first, and if it 
   // exists, the second container. The second container
   // may have been deleted by another option.
-  ds.spec.template.spec.containers[0].image = imageName
+  ds.spec.template.spec.containers[0].image = replaceLatest(
+    ds.spec.template.spec.containers[0].image,
+    optval
+  )
   if (ds.spec.template.spec.containers[1]) {
-    ds.spec.template.spec.containers[1].image = imageName
+    ds.spec.template.spec.containers[1].image = replaceLatest(
+      ds.spec.template.spec.containers[1].image,
+      optval
+    )
   }
 }
 
@@ -170,23 +191,27 @@ const processVersion = (optname, optval, ds) => {
 const processDisableNPC = (optname, optval, ds) => {
   console.log(`Processing option ${optname}=${optval}`)
 
-  if(optval!=='true') {
+  if (optval !== 'true') {
     return
-  } 
+  }
 
   // Set the EXPECT_NPC environment variable to '0'
   processEnvVar('EXPECT_NPC', '0', ds)
 
   // Remove the weave-npc container if it exists
-  const npcContainerIndex = ds.spec.template.spec.containers.findIndex((c) => c.name ==='weave-npc')
-  if(npcContainerIndex!==-1) {
-    ds.spec.template.spec.containers.splice(npcContainerIndex,1)
+  const npcContainerIndex = ds.spec.template.spec.containers.findIndex((c) => c.name === 'weave-npc')
+  if (npcContainerIndex !== -1) {
+    ds.spec.template.spec.containers.splice(npcContainerIndex, 1)
   }
 }
 
 const otherOptionsMap = {
   'version': processVersion,
   'disable-npc': processDisableNPC
+}
+
+const patchLatestTag = (ds) => {
+  processVersion('version', '2.8.1', ds)
 }
 
 export default processWeave

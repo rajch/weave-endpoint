@@ -16,7 +16,7 @@ const SERVER_PORT = process.env.PORT || 8080
 const requestListener = async (req, res) => {
   console.log('----------------------------')
   console.log(`Request: ${req.url}`)
-  
+
   let urlResult = parseWeaveUrl(req.url)
   if (!urlResult.matched) {
     res.writeHead(404, 'No manifest found')
@@ -25,7 +25,7 @@ const requestListener = async (req, res) => {
   }
 
   const reqUrl = new URL(req.url, `http://${req.headers.host}`)
-  
+
   // If there are any query string parameters other than 'k8s-version',
   // process them
   const params = reqUrl.searchParams
@@ -34,28 +34,33 @@ const requestListener = async (req, res) => {
   // This weird syntax for checking the number of url parameters is
   // due to the lack of a 'size' member. See 
   // https://github.com/whatwg/url/issues/163
-  if (!params.entries().next().done) {
-    console.log(`Processing request with ${params}...`)
-  
-    const result = await processWeave(urlResult.manifestUrl, params)
-    if(result.status=='success'){
-      res.setHeader('Content-type','application/yaml')
-      res.writeHead(200,'Ok')
-      res.write(result.body)
-    } else {
-      res.setHeader('Content-type','application/json')
-      res.writeHead(500,'Error while processing')
-      res.write(JSON.stringify(result,"\t"))
-    }
-    res.end()
-    return
-  }
+  // if (!params.entries().next().done) {
 
-  console.log(`Redirecting request with ${params}...`)
-  res.writeHead(302, {
-    location: urlResult.manifestUrl
-  })
+  // Processing _has_ to happen, due to a bug in the released
+  // images and manifest
+  console.log(`Processing request with ${params}...`)
+
+  const result = await processWeave(urlResult.manifestUrl, params)
+  if (result.status == 'success') {
+    res.setHeader('Content-type', 'application/yaml')
+    res.writeHead(200, 'Ok')
+    res.write(result.body)
+  } else {
+    res.setHeader('Content-type', 'application/json')
+    res.writeHead(500, 'Error while processing')
+    res.write(JSON.stringify(result, "\t"))
+  }
   res.end()
+//   return
+// }
+
+  // Processing _has_ to happen, due to a bug in the released
+  // images and manifest
+  // console.log(`Redirecting request with ${params}...`)
+  // res.writeHead(302, {
+  //   location: urlResult.manifestUrl
+  // })
+  // res.end()
 }
 
 const server = createServer(requestListener);
