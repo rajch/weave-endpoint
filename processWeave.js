@@ -77,7 +77,8 @@ const process = (manifest, params) => {
   //   https://github.com/weaveworks/weave/issues/3974
   //   https://github.com/weaveworks/weave/issues/3960#issuecomment-1401496388
   //   https://github.com/weaveworks/weave/issues/3948#issuecomment-1401989143
-  patchLatestTag(ds)
+  // No longer needed because the source has changed to rajch/weave
+  // patchLatestTag(ds)
 
   return {
     status: 'success',
