@@ -1,12 +1,12 @@
 'use strict'
 
-const WEAVE_VERSION = '2.8.1'
+const WEAVE_VERSION = '2.8.2'
 const weaveManifestUrl = (fileName) => {
-  return `https://github.com/weaveworks/weave/releases/download/v${WEAVE_VERSION}/${fileName}`
+  return `https://github.com/rajch/weave/releases/download/v${WEAVE_VERSION}/${fileName}`
 }
 
 const manifestMap = [
-  { k8sVersion: '12', result: weaveManifestUrl('weave-daemonset-k8s.yaml') },
+  // { k8sVersion: '12', result: weaveManifestUrl('weave-daemonset-k8s.yaml') },
   { k8sVersion: '11', result: weaveManifestUrl('weave-daemonset-k8s-1.11.yaml') },
   { k8sVersion: '9', result: weaveManifestUrl('weave-daemonset-k8s-1.9.yaml') },
   { k8sVersion: '8', result: weaveManifestUrl('weave-daemonset-k8s-1.8.yaml') }

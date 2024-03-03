@@ -1,37 +1,27 @@
 # weave-endpoint
 
-HTTP server to download weave net manifest 
+HTTP server to download Weave Net manifest 
 
 ## Raison d'etre
 
-Since the Weave Cloud was [shut down](https://www.weave.works/blog/weave-cloud-end-of-service) in September 2022, the recommended method of installing the weave net CNI plugin became unavailable. This project is an attempt to recreate that method.
+Since the Weave Cloud was [shut down](https://www.weave.works/blog/weave-cloud-end-of-service) in September 2022, the recommended method of installing the Weave Net CNI plugin became unavailable. This project was started to recreate that method.
+
+On February 5th, 2024, Weaveworks CEO Alexis Richardson announced via [LinkedIn](https://www.linkedin.com/posts/richardsonalexis_hi-everyone-i-am-very-sad-to-announce-activity-7160295096825860096-ZS67/) and [Twitter](https://twitter.com/monadic/status/1754530336120140116) that Weaveworks is winding down. A fork, [rajch/weave](https://github.com/rajch/weave) was already being maintained at that point. This project now serves manifests that use images created from that fork.
+
+This project is currently hosted on a Free-tier Azure Web App, accessible at `https://reweave.azurewebsites.net/`.
 
 ## How to use
-
-The recommended method for installing weave used to be this:
-
-```
-kubever=$(kubectl version | base64 | tr -d '\n')
-kubectl apply -f https://cloud.weave.works/k8s/net?k8s-version=$kubever
-```
-This would redirect to the simpler url:
-```
-https://cloud.weave.works/k8s/vX.YZ/net.yaml
-```
-which would generate a manifest appropriate to the version of kubernetes.
-
-This project is currently hosted on a Free-tier Azure Web App, accessible at `https://weave-community-downloader.azurewebsites.net/`.
 
 Weave can now be installed on a kubernetes cluster using:
 
 ```bash
-kubever=$(kubectl version | base64 | tr -d '\n')
-kubectl apply -f https://weave-community-downloader.azurewebsites.net/k8s/net?k8s-version=$kubever
+KUBEVER=$(kubectl version | base64 | tr -d '\n')
+kubectl apply -f https://reweave.azurewebsites.net/k8s/net?k8s-version=$KUBEVER
 ```
 OR
 
 ```bash
-kubectl apply -f https://weave-community-downloader.azurewebsites.net/k8s/v1.25/net.yaml
+kubectl apply -f https://reweave.azurewebsites.net/k8s/v1.25/net.yaml
 ```
 where the `v1.25` part can be replaced with any kubernetes version down to 1.8.
 
@@ -56,7 +46,7 @@ You can customise the YAML you get by passing some of Weave Net's options, argum
 The list of variables you can set is:
 
 * `CHECKPOINT_DISABLE` - if set to 1, disable checking for new Weave Net
-  versions (default is blank, i.e. check is enabled)
+  versions (default is 1, i.e. check is disabled)
 * `CONN_LIMIT` - soft limit on the number of connections between
   peers. Defaults to 200.
 * `HAIRPIN_MODE` - Weave Net defaults to enabling hairpin on the bridge side of
@@ -81,8 +71,8 @@ The list of variables you can set is:
 * `WEAVE_MTU` - Weave Net defaults to 1376 bytes, but you can set a
   smaller size if your underlying network has a tighter limit, or set
   a larger size for better performance if your network supports jumbo
-  frames - see [here](/site/tasks/manage/fastdp.md#mtu) for more
-  details.
+  frames - more
+  details coming soon from `/site/tasks/manage/fastdp.md#mtu`.
 * `NO_MASQ_LOCAL` - set to 0 to disable preserving the client source IP address when
   accessing Service annotated with `service.spec.externalTrafficPolicy=Local`.
   This feature works only with Weave IPAM (default).
@@ -90,9 +80,9 @@ The list of variables you can set is:
 
 Example:
 ```
-$ kubectl apply -f "https://weave-community-downloader.azurewebsites.net/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&env.WEAVE_MTU=1337"
+$ kubectl apply -f "https://reweave.azurewebsites.net/k8s/v1.28/net.yaml?env.WEAVE_MTU=1337"
 ```
-This command -- notice `&env.WEAVE_MTU=1337` at the end of the URL -- generates a YAML file containing, among others:
+This command -- notice `?env.WEAVE_MTU=1337` at the end of the URL -- generates a YAML file containing, among other things:
 
 ```
 [...]
@@ -107,17 +97,5 @@ This command -- notice `&env.WEAVE_MTU=1337` at the end of the URL -- generates 
 
 **Note**: The YAML file can also be saved for later use or manual editing by using, for example:
 ```
-$ curl -fsSLo weave-daemonset.yaml "https://weave-community-downloader.azurewebsites.net/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+$ curl -fsSLo weave-daemonset.yaml "https://reweave.azurewebsites.net/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 ```
-
-## How it works
-
-~~A simple request on either url pattern, without any query parameters, will redirect to the k8s-version-appropriate manifest on the latest weave net release on GitHub.~~
-
-~~If there are query parameters, the appropriate manifest will be fetched, modified as per the parameters, and emitted.~~
-
-The k8s-version-appropriate manifest is fetched from the latest weave net release on GitHub.
-
-It is then modified as per parameters, and emitted.
-
-One compulsory modification is: the `:latest` tag on all images found in the manifest is changed to `:2.8.1`. This is because of issue [3974](https://github.com/weaveworks/weave/issues/3974) on the weave net repository, and a [solution](https://github.com/weaveworks/weave/issues/3960#issuecomment-1401496388) proposed in a comment on another issue.
