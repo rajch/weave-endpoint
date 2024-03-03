@@ -2,6 +2,8 @@
 
 HTTP server to download Weave Net manifest 
 
+[![Build and deploy to Azure Web App - reweave](https://github.com/rajch/weave-endpoint/actions/workflows/main_reweave.yml/badge.svg)](https://github.com/rajch/weave-endpoint/actions/workflows/main_reweave.yml)
+
 ## Raison d'etre
 
 Since the Weave Cloud was [shut down](https://www.weave.works/blog/weave-cloud-end-of-service) in September 2022, the recommended method of installing the Weave Net CNI plugin became unavailable. This project was started to recreate that method.
