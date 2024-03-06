@@ -1,18 +1,19 @@
 'use strict'
 
-import { IncomingMessage, ServerResponse, createServer } from 'node:http'
-import processWeave from './src/processWeave.js'
-import processStatic from './src/proccessStatic.js'
-import { WEAVE_VERSION } from './src/parseWeave.js'
+import { createServer } from 'node:http'
+import { processWeave, processWeaveScript, WEAVE_VERSION } from './src/processWeave.js'
+import { processStatic } from './src/proccessStatic.js'
 
 const SERVER_PORT = process.env.PORT || 8080
 
-const requestListener = async (/** @type {IncomingMessage} */ req, /** @type {ServerResponse} */ res) => {
+const requestListener = async (req, res) => {
   console.log('----------------------------')
   console.log(`Request: ${req.url}`)
 
   if (req.url === '/') {
     await processStatic(req, res, '/index.html')
+  } else if (req.url === ('/get-weave')) {
+    await processWeaveScript(req, res)
   } else if (req.url.startsWith('/k8s/')) {
     await processWeave(req, res)
   } else {

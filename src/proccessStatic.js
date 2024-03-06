@@ -14,7 +14,7 @@ const mimeTypes = {
 const defaultMimeType = 'application/octet-stream'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
-const processStatic = async (req, res, url) => {
+export const processStatic = async (req, res, url) => {
   if (!url) {
     url = req.url
   }
@@ -37,6 +37,3 @@ const getMimeType = (filePath) => {
   const extname = path.extname(filePath)
   return mimeTypes[extname] || defaultMimeType
 }
-
-export default processStatic
-

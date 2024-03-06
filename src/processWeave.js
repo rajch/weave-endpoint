@@ -3,11 +3,136 @@
 import { URL } from 'node:url'
 import fetch from 'node-fetch'
 import yaml from 'js-yaml'
-import parseWeaveUrl from './parseWeave.js'
 
 const cacheMap = {}
 
-const processWeave = async (req, res) => {
+export const WEAVE_VERSION = process.env.WEAVE_VERSION || '2.8.2'
+
+const weaveSourceUrl = (fileName) => {
+  return `https://github.com/rajch/weave/releases/download/v${WEAVE_VERSION}/${fileName}`
+}
+
+const manifestMap = [
+  // { k8sVersion: '12', result: weaveManifestUrl('weave-daemonset-k8s.yaml') },
+  { k8sVersion: '11', result: weaveSourceUrl('weave-daemonset-k8s-1.11.yaml') },
+  { k8sVersion: '9', result: weaveSourceUrl('weave-daemonset-k8s-1.9.yaml') },
+  { k8sVersion: '8', result: weaveSourceUrl('weave-daemonset-k8s-1.8.yaml') }
+]
+
+/**
+ * @typedef {Object} manifestMatchStatus
+ * @property {boolean} matched - true if an appropriate source manifest was found, else false
+ * @property {string} manifestUrl - the source manifest url if found, else undefined
+ */
+
+/**
+ * Chooses the version of the Weave Net manifest to download, based on Kubernetes
+ * version.
+ * @param {Object} kubeVersion The kubernetes version
+ * @param {string} kubeVersion.major K8s Major version
+ * @param {string} kubeVersion.minor K8s Minor version
+ *
+ * @returns {manifestMatchStatus} Manifest match status and url
+ */
+const chooseWeaveManifest = (kubeVersion) => {
+  if (kubeVersion.major !== '1') {
+    return { matched: false }
+  }
+  const record = manifestMap.find(
+    (mm) => parseInt(kubeVersion.minor) >= parseInt(mm.k8sVersion)
+  )
+  if (record) {
+    return { matched: true, manifestUrl: record.result }
+  } else {
+    return { matched: false }
+  }
+}
+
+const base64Decode = (str) => {
+  const base64Decode = Buffer.from(str, 'base64')
+  return base64Decode.toString()
+}
+
+/**
+ * Decodes a base64-encoded kubernetes version string.
+ * @param {string} versionString The encoded string
+ *
+ * @returns {manifestMatchStatus} Manifest match status and url
+ */
+const decodeK8sVersionParam = (versionString) => {
+  // In the classic Weave Net one-liner install, the 'k8s-version' query
+  // string parameter contains the base64-encode output of the `
+  // kubectl version` command. We need to decode this.
+
+  const decoded = base64Decode(versionString)
+  // This matches the output of `kubectl version` in k8s versions up to v1.25
+  const pattern1 = /GitVersion:"v(\d{1})\.(\d{1,2})\.(.*)"/
+  // This matches the output of `kubectl version --short`, which is going to
+  // become the default output of `kubectl version` in the near future
+  const pattern2 = /Client Version: v(\d{1})\.(\d{1,2})\.(.*)/
+
+  let matched = decoded.match(pattern1)
+  if (matched) {
+    return chooseWeaveManifest({
+      major: matched[1],
+      minor: matched[2]
+    })
+  }
+
+  matched = decoded.match(pattern2)
+  if (matched) {
+    return chooseWeaveManifest({
+      major: matched[1],
+      minor: matched[2]
+    })
+  }
+
+  return {
+    matched: false
+  }
+}
+
+/**
+ * Parses a url to see if it matches one of the two patterns
+ * used in the Weave Net one-liner install.
+ * If it does, chooses the appropriate source manifest URL.
+ * @param {string} url A URL path with an optional querystring
+ *
+ * @returns {manifestMatchStatus} Manifest match status and url
+ */
+const parseWeaveUrl = (url) => {
+  // This matches <host>/k8s/v{MAJOR}.{MINOR}/net.yaml
+  const pattern1 = /^\/(k8s\/)?v(\d{1}).(\d{1,2})\/net.yaml/i
+  // This matches <host>/k8s/net?k8s-version={BASE64-encoded `kubectl version` output}
+  const pattern2 = /^\/(k8s\/)?(net\?k8s-version=){1}(.*)/i
+
+  let matched = url.match(pattern1)
+  if (matched) {
+    return chooseWeaveManifest({
+      major: matched[2],
+      minor: matched[3]
+    })
+  }
+
+  matched = url.match(pattern2)
+  if (matched) {
+    return decodeK8sVersionParam(matched[3])
+  }
+
+  return {
+    matched: false
+  }
+}
+
+export const processWeaveScript = async (req, res) => {
+  const scriptUrl = weaveSourceUrl('weave')
+  console.log(`Redirecting to ${scriptUrl}`)
+  res.writeHead(302, { Location: scriptUrl })
+  res.end()
+}
+
+export const processWeave = async (req, res) => {
+  // Try to get a source manifest URL from the request URL
   const urlResult = parseWeaveUrl(req.url)
   if (!urlResult.matched) {
     res.writeHead(404, 'No manifest found')
@@ -17,13 +142,11 @@ const processWeave = async (req, res) => {
 
   const reqUrl = new URL(req.url, `http://${req.headers.host}`)
 
-  // If there are any query string parameters other than 'k8s-version',
-  // process them
   const params = reqUrl.searchParams
+  // The 'k8s-version' query parameter has already been processed
   params.delete('k8s-version')
 
   console.log(`Processing request with ${params}...`)
-
   const result = await processWeaveManifest(urlResult.manifestUrl, params)
   if (result.status === 'success') {
     res.setHeader('Content-type', 'application/yaml')
@@ -38,15 +161,24 @@ const processWeave = async (req, res) => {
 }
 
 /**
- * Generates a weave manifest from Github release source and url parameters
+ * @typedef {Object} processStatus
+ * @property {string} status Result of processing. 'success' or 'error'
+ * @property {any} body The yaml manifest or json error produced by processing
+ */
+
+/**
+ * Fetches/caches a weave manifest from Github release source or cache,
+ * and processes any url parameters.
  * @param {string} weaveManifestUrl
  * @param {URLSearchParams} params
+ *
+ * @returns {processStatus} success with yaml body or error with json body
  */
 const processWeaveManifest = async (weaveManifestUrl, params) => {
   const manifest = cacheMap[weaveManifestUrl]
   if (manifest) {
     console.log(`getting ${weaveManifestUrl} from cache`)
-    return process(manifest, params)
+    return processManifest(manifest, params)
   }
 
   console.log(`getting ${weaveManifestUrl} from remote`)
@@ -56,7 +188,7 @@ const processWeaveManifest = async (weaveManifestUrl, params) => {
     cacheMap[weaveManifestUrl] = data
   }
 
-  return process(data, params)
+  return processManifest(data, params)
 }
 
 /**
@@ -64,8 +196,10 @@ const processWeaveManifest = async (weaveManifestUrl, params) => {
  * the latest release.
  * @param {string} manifest
  * @param {URLSearchParams} params
+ *
+ * @returns {processStatus} success with yaml body or error with json body
  */
-const process = (manifest, params) => {
+const processManifest = (manifest, params) => {
   let yamlDocs
 
   try {
@@ -266,5 +400,3 @@ const otherOptionsMap = {
   version: processVersion,
   'disable-npc': processDisableNPC
 }
-
-export default processWeave

@@ -1,6 +1,6 @@
 # weave-endpoint
 
- Download manifest to deploy Weave Net  
+ Download resources to deploy Weave Net  
 
 [![Build and deploy to Azure Web App - reweave](https://github.com/rajch/weave-endpoint/actions/workflows/main_reweave.yml/badge.svg)](https://github.com/rajch/weave-endpoint/actions/workflows/main_reweave.yml)
 
@@ -14,7 +14,7 @@ This project is currently hosted on a Free-tier Azure Web App, accessible at `ht
 
 ## How to use
 
-Weave can now be installed on a kubernetes cluster using:
+Weave Net can now be installed on a kubernetes cluster using:
 
 ```bash
 KUBEVER=$(kubectl version | base64 | tr -d '\n')
@@ -101,4 +101,10 @@ This command -- notice `?env.WEAVE_MTU=1337` at the end of the URL -- generates 
 
 ```
 $ curl -fsSLo weave-daemonset.yaml "https://reweave.azurewebsites.net/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+```
+
+Finally, the `weave` script can be downloaded using:
+
+```
+curl -fsSLo weave "https://reweave.azurewebsites.net/get-weave"
 ```
