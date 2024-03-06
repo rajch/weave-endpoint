@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReWeave</title>
+</head>
+<body>
+  <main>
+    <h1>ReWeave</h1>
+    <p>ReWeave is a fork of Weave Net, the first product developed by the 
+      currently (and sadly) defunct Weaveworks.</p>
+    <h2>About Weave Net</h2>
+    <p>Weave Net creates a virtual network that connects containers across 
+      multiple hosts and enables their automatic discovery. Applications 
+      use the network just as if the containers were all plugged into the 
+      same network switch, without having to configure port mappings, 
+      ambassadors or links.</p>
+    <h2>Installing Weave Net on Kubernetes</h2>
+    <p>On a newly created Kubernetes cluster, the Weave Net CNI pluging 
+      can be installed by running the following command:</p>
+    <pre>
+      kubectl apply -f https://reweave.azurewebsites.net/k8s/v1.28/net.yaml
+    </pre>
+    <p>Replace <code>v1.28</code> with the version on Kubernetes on your 
+      cluster.</p>
+    <p>More details are available <a href="https://github.com/rajch/weave-endpoint?tab=readme-ov-file#how-to-use">here</a>.</p>
+  </main>
+</body>
+</html>

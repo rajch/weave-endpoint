@@ -1,17 +1,49 @@
 'use strict'
 
-import fetch from "node-fetch"
+import { URL } from 'node:url'
+import fetch from 'node-fetch'
 import yaml from 'js-yaml'
+import parseWeaveUrl from './parseWeave.js'
 
 const cacheMap = {}
 
+const processWeave = async (req, res) => {
+  const urlResult = parseWeaveUrl(req.url)
+  if (!urlResult.matched) {
+    res.writeHead(404, 'No manifest found')
+    res.end()
+    return
+  }
+
+  const reqUrl = new URL(req.url, `http://${req.headers.host}`)
+
+  // If there are any query string parameters other than 'k8s-version',
+  // process them
+  const params = reqUrl.searchParams
+  params.delete('k8s-version')
+
+  console.log(`Processing request with ${params}...`)
+
+  const result = await processWeaveManifest(urlResult.manifestUrl, params)
+  if (result.status === 'success') {
+    res.setHeader('Content-type', 'application/yaml')
+    res.writeHead(200, 'Ok')
+    res.write(result.body)
+  } else {
+    res.setHeader('Content-type', 'application/json')
+    res.writeHead(500, 'Error while processing')
+    res.write(JSON.stringify(result, '\t'))
+  }
+  res.end()
+}
+
 /**
- * Generates a weave manifest from Github release and url parameters
- * @param {string} weaveManifestUrl 
+ * Generates a weave manifest from Github release source and url parameters
+ * @param {string} weaveManifestUrl
  * @param {URLSearchParams} params
  */
-const processWeave = async (weaveManifestUrl, params) => {
-  let manifest = cacheMap[weaveManifestUrl]
+const processWeaveManifest = async (weaveManifestUrl, params) => {
+  const manifest = cacheMap[weaveManifestUrl]
   if (manifest) {
     console.log(`getting ${weaveManifestUrl} from cache`)
     return process(manifest, params)
@@ -20,16 +52,18 @@ const processWeave = async (weaveManifestUrl, params) => {
   console.log(`getting ${weaveManifestUrl} from remote`)
   const manifestDownload = await fetch(weaveManifestUrl)
   const data = await manifestDownload.text()
-  cacheMap[weaveManifestUrl] = data
+  if (manifestDownload.status === 200) {
+    cacheMap[weaveManifestUrl] = data
+  }
 
   return process(data, params)
 }
 
 /**
  * Processes the weave net yaml manifest downloaded from
- * the latest release. 
- * @param {string} manifest 
- * @param {URLSearchParams} params 
+ * the latest release.
+ * @param {string} manifest
+ * @param {URLSearchParams} params
  */
 const process = (manifest, params) => {
   let yamlDocs
@@ -53,7 +87,7 @@ const process = (manifest, params) => {
     return processError('Could not find daemonset')
   }
 
-  for (let opt of params.entries()) {
+  for (const opt of params.entries()) {
     // Process env.NAME=VALUE options
     const envParamMatch = opt[0].match(/env\.(.*)/)
     if (envParamMatch) {
@@ -70,15 +104,7 @@ const process = (manifest, params) => {
 
     // Process other options
     processOtherOptions(opt[0], opt[1], ds)
-
   }
-
-  // Patch :latest tag, because of:
-  //   https://github.com/weaveworks/weave/issues/3974
-  //   https://github.com/weaveworks/weave/issues/3960#issuecomment-1401496388
-  //   https://github.com/weaveworks/weave/issues/3948#issuecomment-1401989143
-  // No longer needed because the source has changed to rajch/weave
-  // patchLatestTag(ds)
 
   return {
     status: 'success',
@@ -88,7 +114,7 @@ const process = (manifest, params) => {
 
 /**
  * Inserts or modifies an environment variable in an env: array
- * @param {Object[]} envvararray 
+ * @param {Object[]} envvararray
  * @param {Object} element
  * @param {string} element.name
  * @param {string} element.value
@@ -126,10 +152,16 @@ const allowedEnvVars = [
   'IPTABLES_BACKEND'
 ]
 
+/**
+ * Manipulates environment variables in the first container defined in the
+ * Weave Net manifest.
+ * @param {string} varname
+ * @param {string} varvalue
+ * @param {any} ds
+ */
 const processEnvVar = (varname, varvalue, ds) => {
   if (allowedEnvVars.includes(varname)) {
-
-    //ds.spec.template.spec.containers[0].env.push({ name: varname, value: varvalue })
+    // ds.spec.template.spec.containers[0].env.push({ name: varname, value: varvalue })
     upsertEnvVar(ds.spec.template.spec.containers[0].env, { name: varname, value: varvalue })
   } else {
     console.log(`Not adding unknown env var ${varname}=${varvalue}`)
@@ -138,6 +170,13 @@ const processEnvVar = (varname, varvalue, ds) => {
 
 // SELinux query parameters
 
+/**
+ * Manipulates SELinux settings in the pod spec defined in the
+ * Weave Net manifest.
+ * @param {string} optname
+ * @param {string} optvalue
+ * @param {any} ds
+ */
 const processSELinuxOption = (optname, optval, ds) => {
   console.log(`Adding SELinux option ${optname}=${optval}`)
   ds.spec.template.spec.securityContext.seLinuxOptions[optname] = optval
@@ -145,6 +184,12 @@ const processSELinuxOption = (optname, optval, ds) => {
 
 // All other query parameters
 
+/**
+ * Handles any other url parameters.
+ * @param {string} optname
+ * @param {string} optvalue
+ * @param {any} ds
+ */
 const processOtherOptions = (optname, optval, ds) => {
   const processor = otherOptionsMap[optname]
   if (processor) {
@@ -154,41 +199,52 @@ const processOtherOptions = (optname, optval, ds) => {
   }
 }
 
-// The 'version' query parameter
-
+/**
+ * Handles the 'version' query parameter by setting the image versions of
+ * all containers in the pod spec defined in the Weave Net manifest.
+ * @param {string} optname
+ * @param {string} optvalue
+ * @param {any} ds
+ */
 const processVersion = (optname, optval, ds) => {
   console.log(`Processing option ${optname}=${optval}`)
 
-  const replaceLatest = (imageName, optval) => {
-    return imageName.replace(/\:latest$/, `:${optval}`)
+  const replaceImageTag = (imageName, optval) => {
+    return imageName.replace(/:(.*)$/, `:${optval}`)
   }
 
   // Change the image property of the init container
   // if it exists
   if (ds.spec.template.spec.initContainers[0]) {
-    ds.spec.template.spec.initContainers[0].image = replaceLatest(
+    ds.spec.template.spec.initContainers[0].image = replaceImageTag(
       ds.spec.template.spec.initContainers[0].image,
       optval
     )
   }
 
-  // Change the image property of the first, and if it 
+  // Change the image property of the first, and if it
   // exists, the second container. The second container
   // may have been deleted by another option.
-  ds.spec.template.spec.containers[0].image = replaceLatest(
+  ds.spec.template.spec.containers[0].image = replaceImageTag(
     ds.spec.template.spec.containers[0].image,
     optval
   )
   if (ds.spec.template.spec.containers[1]) {
-    ds.spec.template.spec.containers[1].image = replaceLatest(
+    ds.spec.template.spec.containers[1].image = replaceImageTag(
       ds.spec.template.spec.containers[1].image,
       optval
     )
   }
 }
 
-// The 'disable-npc' query parameter
-
+/**
+ * Handles the 'disable-npc' query parameter by setting an environment
+ * variable, and deleteing the second container in the pod spec defined
+ * in the Weave Net manifest.
+ * @param {string} optname
+ * @param {string} optvalue
+ * @param {any} ds
+ */
 const processDisableNPC = (optname, optval, ds) => {
   console.log(`Processing option ${optname}=${optval}`)
 
@@ -207,12 +263,8 @@ const processDisableNPC = (optname, optval, ds) => {
 }
 
 const otherOptionsMap = {
-  'version': processVersion,
+  version: processVersion,
   'disable-npc': processDisableNPC
-}
-
-const patchLatestTag = (ds) => {
-  processVersion('version', '2.8.1', ds)
 }
 
 export default processWeave

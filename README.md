@@ -1,6 +1,6 @@
 # weave-endpoint
 
-HTTP server to download Weave Net manifest 
+ Download manifest to deploy Weave Net  
 
 [![Build and deploy to Azure Web App - reweave](https://github.com/rajch/weave-endpoint/actions/workflows/main_reweave.yml/badge.svg)](https://github.com/rajch/weave-endpoint/actions/workflows/main_reweave.yml)
 
@@ -98,6 +98,7 @@ This command -- notice `?env.WEAVE_MTU=1337` at the end of the URL -- generates 
 ```
 
 **Note**: The YAML file can also be saved for later use or manual editing by using, for example:
+
 ```
 $ curl -fsSLo weave-daemonset.yaml "https://reweave.azurewebsites.net/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
 ```

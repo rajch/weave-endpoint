@@ -1,6 +1,7 @@
 'use strict'
 
-const WEAVE_VERSION = '2.8.2'
+export const WEAVE_VERSION = process.env.WEAVE_VERSION || '2.8.2'
+
 const weaveManifestUrl = (fileName) => {
   return `https://github.com/rajch/weave/releases/download/v${WEAVE_VERSION}/${fileName}`
 }
@@ -17,7 +18,7 @@ const manifestMap = [
  * @param {Object} kubeVersion The kubernetes version
  * @param {string} kubeVersion.major K8s Major version
  * @param {string} kubeVersion.minor K8s Minor version
- * 
+ *
  */
 const getWeaveManifest = (kubeVersion) => {
   if (kubeVersion.major !== '1') {
@@ -34,7 +35,7 @@ const getWeaveManifest = (kubeVersion) => {
 }
 
 const base64Decode = (str) => {
-  const base64Decode = Buffer.from(str, "base64")
+  const base64Decode = Buffer.from(str, 'base64')
   return base64Decode.toString()
 }
 
@@ -46,7 +47,7 @@ const decodeVersion = (versionString) => {
   const decoded = base64Decode(versionString)
   // This matches the output of `kubectl version` in k8s versions up to v1.25
   const pattern1 = /GitVersion:"v(\d{1})\.(\d{1,2})\.(.*)"/
-  // This matches the output of `kubectl version --short`, which is going to 
+  // This matches the output of `kubectl version --short`, which is going to
   // become the default output of `kubectl version` in the near future
   const pattern2 = /Client Version: v(\d{1})\.(\d{1,2})\.(.*)/
 
