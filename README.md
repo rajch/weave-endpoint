@@ -6,7 +6,7 @@
 
 ## Raison d'etre
 
-Since the Weave Cloud was [shut down](https://www.weave.works/blog/weave-cloud-end-of-service) in September 2022, the recommended method of installing the Weave Net CNI plugin became unavailable. This project was started to recreate that method.
+Since the Weave Cloud was shut down in September 2022, the recommended method of installing the Weave Net CNI plugin became unavailable. This project was started to recreate that method.
 
 On February 5th, 2024, Weaveworks CEO Alexis Richardson announced via [LinkedIn](https://www.linkedin.com/posts/richardsonalexis_hi-everyone-i-am-very-sad-to-announce-activity-7160295096825860096-ZS67/) and [Twitter](https://twitter.com/monadic/status/1754530336120140116) that Weaveworks is winding down. A fork, [rajch/weave](https://github.com/rajch/weave) was already being maintained at that point. This project now serves manifests that use images created from that fork.
 
@@ -31,14 +31,27 @@ where the `v1.25` part can be replaced with any kubernetes version down to 1.8.
 
 You can customise the YAML you get by passing some of Weave Net's options, arguments and environment variables as query parameters. **Note:** This is a work in progress. The parameters that have been implemented are called out below.
 
-  - `version`: Weave Net's version. Default: `latest`, i.e. latest release. *N.B.*: This only changes the specified version inside the generated YAML file, it does not ensure that the rest of the YAML is compatible with that version. To freeze the YAML version save a copy of the YAML file from the [release page](https://github.com/weaveworks/weave/releases) and use that copy instead of downloading it each time. **Note:** This is implemented.  
-  - `password-secret`: name of the Kubernetes secret containing your password.  *N.B*: The Kubernetes secret name must correspond to a name of a file containing your password.
+  - `version`: Weave Net's version. Default: `latest`, i.e. latest release. **N.B.**: This only changes the specified version inside the generated YAML file, it does not ensure that the rest of the YAML is compatible with that version. To freeze the YAML version save a copy of the YAML file from the [release page](https://github.com/rajch/weave/releases) and use that copy instead of downloading it each time. **Note:** This is implemented.  
+  - `password-secret`: name of the Kubernetes secret containing your password.  **N.B.**: The Kubernetes secret name, and the name of the key containing your password must be the same - the value of this parameter.
      Example:
 
-        $ echo "s3cr3tp4ssw0rd" > /var/lib/weave/weave-passwd
+        $ echo "Swordfish" > /var/lib/weave/weave-passwd
         $ kubectl create secret -n kube-system generic weave-passwd --from-file=/var/lib/weave/weave-passwd
-        $ kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')&password-secret=weave-passwd"
 
+    The resulting Secret object will look like this:
+
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: weave-passwd
+        data:
+          weave-passwd: U3dvcmRmaXNoCg==
+
+    Then, the value of the `password-secret` parameter can be set to `weave-passwd`, like this:
+
+        $ kubectl apply -f "https://reweave.azurewebsites.net/k8s/v1.25/net.yaml&password-secret=weave-passwd"
+
+    **Note:** This is implemented.
   - `known-peers`: comma-separated list of hosts. Default: empty.
   - `trusted-subnets`: comma-separated list of CIDRs. Default: empty.
   - `disable-npc`: boolean (`true|false`). Default: `false`. **Note:** This is implemented.
@@ -68,6 +81,7 @@ The list of variables you can set is:
   configuring the addon as a static pod.
 * `WEAVE_METRICS_ADDR` - address and port that the Weave Net
   daemon will serve Prometheus-style metrics on (defaults to 0.0.0.0:6782)
+*  `WEAVE_PASSWORD` - shared key to use during session key generation to encrypt traffic between peers. *It is recommended that you use the `password-secret` parameter defined above instead*.
 * `WEAVE_STATUS_ADDR` - address and port that the Weave Net
   daemon will serve status requests on (defaults to disabled)
 * `WEAVE_MTU` - Weave Net defaults to 1376 bytes, but you can set a

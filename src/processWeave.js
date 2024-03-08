@@ -246,6 +246,15 @@ const processManifest = (manifest, params) => {
   }
 }
 
+const showElement = (element) => {
+  if (element.valueFrom) {
+    console.log(`  valueFrom: ${JSON.stringify(element.valueFrom, '  ')}`)
+  }
+  if (element.value) {
+    console.log(`  value: ${element.value}`)
+  }
+}
+
 /**
  * Inserts or modifies an environment variable in an env: array
  * @param {Object[]} envvararray
@@ -256,10 +265,20 @@ const processManifest = (manifest, params) => {
 const upsertEnvVar = (envvararray, element) => {
   const existingIndex = envvararray.findIndex((v) => v.name === element.name)
   if (existingIndex !== -1) {
-    console.log(`Modifying env var ${element.name}=${element.value} at index ${existingIndex}`)
-    envvararray[existingIndex].value = element.value
+    console.log(`Modifying env var ${element.name} at index ${existingIndex}`)
+    showElement(element)
+
+    if (element.valueFrom) {
+      delete envvararray[existingIndex].value
+      envvararray[existingIndex].valueFrom = element.valueFrom
+    }
+    if (element.value) {
+      delete envvararray[existingIndex].valueFrom
+      envvararray[existingIndex].value = element.value
+    }
   } else {
-    console.log(`Adding env var ${element.name}=${element.value}`)
+    console.log(`Adding env var ${element.name}`)
+    showElement(element)
     envvararray.push(element)
   }
 }
@@ -280,6 +299,7 @@ const allowedEnvVars = [
   'IPALLOC_INIT',
   'WEAVE_EXPOSE_IP',
   'WEAVE_METRICS_ADDR',
+  'WEAVE_PASSWORD',
   'WEAVE_STATUS_ADDR',
   'WEAVE_MTU',
   'NO_MASQ_LOCAL',
@@ -396,7 +416,36 @@ const processDisableNPC = (optname, optval, ds) => {
   }
 }
 
+/**
+ * Handles the 'password-secret' query parameter by setting an environment
+ * variable called WEAVE_PASSWORD, and getting its value from a Secret
+ * resource whose name is the value of the parameter, and which also has a
+ * key whose name is the value of the parameter.
+ * @param {string} optname
+ * @param {string} optvalue
+ * @param {any} ds
+ */
+const processPasswordSecret = (optname, optval, ds) => {
+  if (!optval) {
+    return
+  }
+
+  upsertEnvVar(
+    ds.spec.template.spec.containers[0].env,
+    {
+      name: 'WEAVE_PASSWORD',
+      valueFrom: {
+        secretKeyRef: {
+          key: optval,
+          name: optval
+        }
+      }
+    }
+  )
+}
+
 const otherOptionsMap = {
   version: processVersion,
-  'disable-npc': processDisableNPC
+  'disable-npc': processDisableNPC,
+  'password-secret': processPasswordSecret
 }
