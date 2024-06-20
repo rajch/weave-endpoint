@@ -3,13 +3,19 @@
 import { URL } from 'node:url'
 import fetch from 'node-fetch'
 import yaml from 'js-yaml'
+import { url } from 'node:inspector'
+import { match } from 'node:assert'
 
 const cacheMap = {}
 
-export const WEAVE_VERSION = process.env.WEAVE_VERSION || '2.8.2'
+export const WEAVE_VERSION = process.env.WEAVE_VERSION || '2.8.8'
+
+const weaveReleaseUrl = (version, fileName) => {
+  return `https://github.com/rajch/weave/releases/download/v${version}/${fileName}`
+}
 
 const weaveSourceUrl = (fileName) => {
-  return `https://github.com/rajch/weave/releases/download/v${WEAVE_VERSION}/${fileName}`
+  return weaveReleaseUrl(WEAVE_VERSION, fileName)
 }
 
 const manifestMap = [
@@ -125,7 +131,14 @@ const parseWeaveUrl = (url) => {
 }
 
 export const processWeaveScript = async (req, res) => {
-  const scriptUrl = weaveSourceUrl('weave')
+  const reqUrl = new URL(req.url, `http://${req.headers.host}`);
+  const params = reqUrl.searchParams;
+  const urlversionparam = params.get('version');
+  const versionpattern = /v{0,1}(2\.[0-9]{1,3}\.[0-9]{1,3})/i;
+  const matches = urlversionparam && urlversionparam.match(versionpattern);
+  const version = matches ? matches[1] : WEAVE_VERSION;
+
+  const scriptUrl = weaveReleaseUrl(version, 'weave')
   console.log(`Redirecting to ${scriptUrl}`)
   res.writeHead(302, { Location: scriptUrl })
   res.end()

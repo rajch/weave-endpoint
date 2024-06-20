@@ -12,7 +12,7 @@ const requestListener = async (req, res) => {
 
   if (req.url === '/') {
     await processStatic(req, res, '/index.html')
-  } else if (req.url === ('/get-weave')) {
+  } else if (req.url === ('/get-weave') || req.url.startsWith('/get-weave?')) {
     await processWeaveScript(req, res)
   } else if (req.url.startsWith('/k8s/')) {
     await processWeave(req, res)
