@@ -92,7 +92,8 @@ The list of variables you can set is:
 * `NO_MASQ_LOCAL` - set to 0 to disable preserving the client source IP address when
   accessing Service annotated with `service.spec.externalTrafficPolicy=Local`.
   This feature works only with Weave IPAM (default).
-* `IPTABLES_BACKEND` - set to `nft` to use `nftables` backend for `iptables` (default is `iptables`) 
+* `IPTABLES_BACKEND` - set to `nft` to use `nftables` backend for `iptables` (default is `iptables`)
+* `WEAVE_DEBUG` - set to `true` to enable debug output in logs (deafault is unset)
 
 Example:
 ```

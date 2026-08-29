@@ -316,11 +316,16 @@ const allowedEnvVars = [
   'WEAVE_STATUS_ADDR',
   'WEAVE_MTU',
   'NO_MASQ_LOCAL',
-  'IPTABLES_BACKEND'
+  'IPTABLES_BACKEND',
+  'WEAVE_DEBUG'
+]
+
+const npcEnvVars = [
+  'WEAVE_DEBUG'
 ]
 
 /**
- * Manipulates environment variables in the first container defined in the
+ * Manipulates environment variables in the containers defined in the
  * Weave Net manifest.
  * @param {string} varname
  * @param {string} varvalue
@@ -328,8 +333,15 @@ const allowedEnvVars = [
  */
 const processEnvVar = (varname, varvalue, ds) => {
   if (allowedEnvVars.includes(varname)) {
-    // ds.spec.template.spec.containers[0].env.push({ name: varname, value: varvalue })
+    // All environment variables apply to the first container (weave) as
+    // defined in the Weave Net deployment manifest.
     upsertEnvVar(ds.spec.template.spec.containers[0].env, { name: varname, value: varvalue })
+    // Some environment variables should also apply to the second 
+    // container (weave-npc).
+    if(npcEnvVars.includes(varname)) {
+      upsertEnvVar(ds.spec.template.spec.containers[1].env, { name: varname, value: varvalue })
+    }
+
   } else {
     console.log(`Not adding unknown env var ${varname}=${varvalue}`)
   }
